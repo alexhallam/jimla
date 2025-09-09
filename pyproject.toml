@@ -1,0 +1,45 @@
+[project]
+name = "jimla"
+version = "0.1.0"
+description = "regression with variational inference"
+readme = "README.md"
+authors = [{ name = "Alex Hallam", email = "alex.hallam@cfacorp.com" }]
+requires-python = ">=3.13"
+dependencies = [
+    "blackjax>=1.2.5",
+    "fiasto-py>=0.1.0",
+    "polars>=1.33.1",
+    "jax>=0.4.0",
+    "jaxlib>=0.4.0",
+    "numpy>=1.24.0",
+    "tidy-viewer-py>=0.3.0",
+    "rich>=13.0.0",
+    "rpy2>=3.5.0",
+    "wayne-trade>=0.1.1",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/jimla"]
+exclude = [
+    "/.git",
+    "/.gitignore",
+    "/.github",
+    "/.vscode",
+    "/.idea",
+    "*.pyc",
+    "__pycache__",
+    "*.egg-info",
+    ".pytest_cache",
+    ".coverage",
+    "htmlcov",
+    ".tox",
+    ".mypy_cache",
+    ".ruff_cache",
+]
+
+[tool.hatch.build]
+include-vcs = false
