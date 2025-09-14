@@ -156,7 +156,7 @@ if __name__ == "__main__":
     df = load_mtcars()
     
     # Compare models on the specified formula
-    formula = "mpg ~ wt + cyl"
+    formula = "mpg ~ cyl + wt*hp - 1"
     jimla_result, r_result, comparison = compare_models(df, formula)
     
     # Additional comparison with different formula
@@ -164,4 +164,4 @@ if __name__ == "__main__":
     print("ADDITIONAL COMPARISON: Single predictor model")
     print("="*60)
     
-    jimla_result2, r_result2, comparison2 = compare_models(df, "mpg ~ wt")
+    jimla_result2, r_result2, comparison2 = compare_models(df, "mpg ~ cyl + wt*hp - 1")

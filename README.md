@@ -25,32 +25,19 @@ pip install jimla
 ```python
 import polars as pl
 import numpy as np
-from jimla import lm, tidy, augment, glance
+from jimla import lm, augment, glance
 
-# Create sample data
-np.random.seed(42)
-n = 100
-x1 = np.random.normal(0, 1, n)
-x2 = np.random.normal(0, 1, n)
-y = 2 + 1.5 * x1 + 0.8 * x2 + np.random.normal(0, 0.5, n)
+mtcars_path = 'https://gist.githubusercontent.com/seankross/a412dfbd88b3db70b74b/raw/5f23f993cd87c283ce766e7ac6b329ee7cc2e1d1/mtcars.csv'
+df = pl.read_csv(mtcars_path)
 
-df = pl.DataFrame({
-    "y": y,
-    "x1": x1,
-    "x2": x2
-})
+# lm() automatically prints tidy output
+result = lm(df, "mpg ~ cyl + wt*hp - 1")
 
-# Fit regression model
-result = lm(df, "y ~ x1 + x2")
+# Show augmented data
+augment(result, df)
 
-# Get tidy output (coefficients and statistics)
-tidy_result = tidy(result)
-
-# Augment original data with model information
-augmented_data = augment(result, df)
-
-# Get one-row model summary
-model_summary = glance(result)
+# Show model summary
+glance(result)
 ```
 
 ## API Reference
@@ -70,7 +57,7 @@ Fit a Linear regression model using (blackjax)[https://blackjax-devs.github.io/b
 ### `tidy(result: RegressionResult, display: bool = True, title: str = None, color_theme: str = "default") -> pl.DataFrame`
 
 Create a tidy summary of regression results, similar to `broom::tidy()`.
-Uses tidy-viewer for enhanced display by default.
+Note: Tidy output is automatically printed when calling `lm()`, but you can call this function manually if needed.
 
 **Parameters:**
 - `result`: RegressionResult from `lm()`
@@ -79,7 +66,7 @@ Uses tidy-viewer for enhanced display by default.
 - `color_theme`: Color theme for display ("default", "dracula", etc.)
 
 **Returns:**
-- `pl.DataFrame`: DataFrame with columns: term, estimate, std.error, statistic, p.value, conf.low, conf.high
+- `pl.DataFrame`: DataFrame with columns: term, estimate, std_error, statistic, p_value, conf_low_2_5, conf_high_97_5
 
 ### `augment(result: RegressionResult, data: pl.DataFrame, display: bool = True, title: str = None, color_theme: str = "default") -> pl.DataFrame`
 
@@ -106,7 +93,7 @@ Create a one-row model summary, similar to `broom::glance()`.
 - `color_theme`: Color theme for display ("default", "dracula", etc.)
 
 **Returns:**
-- `pl.DataFrame`: One-row DataFrame with: r_squared, adj_r_squared, sigma, sigma_std, n_obs, n_params, df_residual, n_samples, n_eff, formula, method
+- `pl.DataFrame`: One-row DataFrame with: r_squared, adj_r_squared, sigma, statistic, p_value, df, logLik, AIC, BIC, deviance, df_residual, nobs
 
 ## Supported Formula Syntax
 

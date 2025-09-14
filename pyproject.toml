@@ -1,6 +1,6 @@
 [project]
 name = "jimla"
-version = "0.1.0"
+version = "0.1.1"
 description = "Bayesian linear regression with variational inference, inspired by R's lm() and broom"
 readme = "README.md"
 authors = [{ name = "Alex Hallam", email = "alex.hallam@cfacorp.com" }]

@@ -107,6 +107,16 @@ def lm(df: pl.DataFrame, formula: str, **kwargs) -> RegressionResult:
             gtol=kwargs.get('tol', 1e-6)
         )
         
+        # Sample from posterior for uncertainty estimates
+        progress.update(task, description="Sampling from posterior")
+        samples_tuple = pathfinder_module.sample(
+            rng_key,
+            pathfinder_result,
+            num_samples=kwargs.get('num_samples', 1000)
+        )
+        # Extract the actual samples (first element of tuple)
+        samples = samples_tuple[0] if isinstance(samples_tuple, tuple) else samples_tuple
+        
         progress.update(task, completed=100)
     
     # Extract results
@@ -122,14 +132,16 @@ def lm(df: pl.DataFrame, formula: str, **kwargs) -> RegressionResult:
     ss_tot = jnp.sum((y - jnp.mean(y))**2)
     r_squared = 1 - ss_res / ss_tot
     
-    # Store pathfinder result for potential future use
+    # Store pathfinder result and samples for potential future use
     pathfinder_dict = {
         'position': pathfinder_result.position,
         'elbo': pathfinder_result.elbo,
-        'grad_position': pathfinder_result.grad_position
+        'grad_position': pathfinder_result.grad_position,
+        'samples': samples
     }
     
-    return RegressionResult(
+    # Create result object
+    result = RegressionResult(
         coefficients=coefficients,
         r_squared=float(r_squared),
         formula=formula,
@@ -137,3 +149,65 @@ def lm(df: pl.DataFrame, formula: str, **kwargs) -> RegressionResult:
         n_params=n_params,
         pathfinder_result=pathfinder_dict
     )
+    
+    # Automatically print tidy output
+    _print_tidy_output(result)
+    
+    return result
+
+
+def _print_tidy_output(result: RegressionResult):
+    """Print tidy output automatically after fitting."""
+    import polars as pl
+    import numpy as np
+    import tidy_viewer_py as tv
+    
+    # Get posterior samples
+    samples = result.pathfinder_result.get('samples', None)
+    
+    # Create tidy format data
+    coef_data = []
+    for i, (term, estimate) in enumerate(result.coefficients.items()):
+        if samples is not None and i < samples.shape[1] - 1:  # Exclude sigma
+            # Extract samples for this coefficient
+            coef_samples = samples[:, i]
+            
+            # Compute statistics
+            std_error = float(np.std(coef_samples))
+            statistic = float(estimate / std_error) if std_error > 0 else np.nan
+            p_value = 2 * (1 - _normal_cdf(abs(statistic))) if not np.isnan(statistic) else np.nan
+            
+            # Compute credible intervals (95%)
+            conf_low = float(np.percentile(coef_samples, 2.5))
+            conf_high = float(np.percentile(coef_samples, 97.5))
+        else:
+            # Fallback to NaN if no samples
+            std_error = np.nan
+            statistic = np.nan
+            p_value = np.nan
+            conf_low = np.nan
+            conf_high = np.nan
+        
+        coef_data.append({
+            'term': term,
+            'estimate': float(estimate),
+            'std_error': std_error,
+            'statistic': statistic,
+            'p_value': p_value,
+            'conf_low_2_5': conf_low,
+            'conf_high_97_5': conf_high
+        })
+    
+    # Create DataFrame
+    df = pl.DataFrame(coef_data)
+    
+    # Display using tidy-viewer
+    viewer = tv.TV()
+    viewer.print_polars_dataframe(df)
+
+
+def _normal_cdf(x):
+    """Approximate normal CDF for p-value calculation."""
+    import numpy as np
+    # Simple approximation using error function
+    return 0.5 * (1 + np.sign(x) * np.sqrt(1 - np.exp(-2 * x**2 / np.pi)))

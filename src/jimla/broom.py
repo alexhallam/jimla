@@ -29,28 +29,80 @@ def tidy(result: RegressionResult,
     Returns:
         Polars DataFrame with coefficient information
     """
+    # Get posterior samples
+    samples = result.pathfinder_result.get('samples', None)
+    
     # Extract coefficients and create tidy format
     coef_data = []
-    for term, estimate in result.coefficients.items():
+    for i, (term, estimate) in enumerate(result.coefficients.items()):
+        if samples is not None and i < samples.shape[1] - 1:  # Exclude sigma
+            # Extract samples for this coefficient
+            coef_samples = samples[:, i]
+            
+            # Compute statistics
+            std_error = float(np.std(coef_samples))
+            statistic = float(estimate / std_error) if std_error > 0 else np.nan
+            p_value = 2 * (1 - _normal_cdf(abs(statistic))) if not np.isnan(statistic) else np.nan
+            
+            # Compute credible intervals (95%)
+            conf_low = float(np.percentile(coef_samples, 2.5))
+            conf_high = float(np.percentile(coef_samples, 97.5))
+        else:
+            # Fallback to NaN if no samples
+            std_error = np.nan
+            statistic = np.nan
+            p_value = np.nan
+            conf_low = np.nan
+            conf_high = np.nan
+        
         coef_data.append({
             'term': term,
             'estimate': float(estimate),
-            'std.error': np.nan,  # Would need posterior samples to compute
-            'statistic': np.nan,  # Would need posterior samples to compute
-            'p.value': np.nan,    # Would need posterior samples to compute
-            'conf.low': np.nan,   # Would need posterior samples to compute
-            'conf.high': np.nan   # Would need posterior samples to compute
+            'std_error': std_error,
+            'statistic': statistic,
+            'p_value': p_value,
+            'conf_low_2_5': conf_low,
+            'conf_high_97_5': conf_high
         })
     
     # Create DataFrame
     df = pl.DataFrame(coef_data)
     
     if display:
-        display_title = title or "JIMLA Coefficients (tidy)"
         viewer = tv.TV()
-        viewer.print_polars_dataframe(df, title=display_title, color_theme=color_theme)
+        viewer.print_polars_dataframe(df)
     
     return df
+
+
+def _normal_cdf(x):
+    """Approximate normal CDF for p-value calculation."""
+    # Simple approximation using error function
+    return 0.5 * (1 + np.sign(x) * np.sqrt(1 - np.exp(-2 * x**2 / np.pi)))
+
+
+def _f_cdf(x, df1, df2):
+    """Approximate F-distribution CDF for p-value calculation."""
+    # Simple approximation for F-distribution CDF
+    # This is a rough approximation - for production use, consider using scipy.stats
+    if x <= 0:
+        return 0.0
+    if x >= 100:  # Very large F-statistic
+        return 1.0
+    
+    # Simple approximation using beta function relationship
+    # F = (X1/df1) / (X2/df2) where X1 ~ χ²(df1), X2 ~ χ²(df2)
+    # For large degrees of freedom, F approaches normal
+    if df1 > 30 and df2 > 30:
+        # Normal approximation
+        mean = df2 / (df2 - 2) if df2 > 2 else 1.0
+        var = 2 * df2**2 * (df1 + df2 - 2) / (df1 * (df2 - 2)**2 * (df2 - 4)) if df2 > 4 else 1.0
+        z = (x - mean) / np.sqrt(var)
+        return _normal_cdf(z)
+    else:
+        # Simple approximation for smaller degrees of freedom
+        # This is very rough - in practice, use scipy.stats.f.cdf
+        return min(1.0, max(0.0, 1 - np.exp(-x / 2)))
 
 
 def augment(result: RegressionResult, 
@@ -106,9 +158,8 @@ def augment(result: RegressionResult,
     ])
     
     if display:
-        display_title = title or "JIMLA Augmented Data"
         viewer = tv.TV()
-        viewer.print_polars_dataframe(augmented_data, title=display_title, color_theme=color_theme)
+        viewer.print_polars_dataframe(augmented_data)
     
     return augmented_data
 
@@ -142,23 +193,68 @@ def glance(result: RegressionResult,
     if response_var is None:
         raise ValueError(f"No response variable found in formula '{result.formula}'")
     
-    # For log-likelihood calculation, we need the original data
-    # Since we don't have it here, we'll use a placeholder
-    log_lik = np.nan  # Would need original data to calculate properly
+    # Get posterior samples for calculations
+    samples = result.pathfinder_result.get('samples', None)
     
-    # Create glance data
+    # Initialize values
+    sigma_estimate = np.nan
+    log_lik = np.nan
+    AIC = np.nan
+    BIC = np.nan
+    deviance = np.nan
+    statistic = np.nan
+    p_value = np.nan
+    
+    if samples is not None:
+        # Extract sigma samples (last column)
+        sigma_samples = np.exp(samples[:, -1])  # Convert from log(sigma) to sigma
+        sigma_estimate = float(np.mean(sigma_samples))
+        
+        # Calculate log-likelihood using the mean sigma
+        # For a normal likelihood: log L = -n/2 * log(2π) - n/2 * log(σ²) - 1/(2σ²) * Σ(y - Xβ)²
+        # We'll use the R-squared to approximate the residual sum of squares
+        # RSS = (1 - R²) * TSS, where TSS = n * var(y)
+        # For simplicity, we'll use the mean of the posterior samples
+        if result.r_squared < 1.0:
+            # Approximate log-likelihood using R-squared and sigma
+            n = result.n_obs
+            log_lik = -n/2 * np.log(2 * np.pi) - n/2 * np.log(sigma_estimate**2) - n/2
+            
+            # Calculate AIC and BIC
+            k = result.n_params
+            AIC = -2 * log_lik + 2 * k
+            BIC = -2 * log_lik + k * np.log(n)
+            
+            # Calculate deviance (negative log-likelihood)
+            deviance = -2 * log_lik
+            
+            # Calculate F-statistic approximation
+            # F = (R² / (k-1)) / ((1-R²) / (n-k))
+            if result.r_squared > 0 and result.r_squared < 1:
+                numerator = result.r_squared / (result.n_params - 1)
+                denominator = (1 - result.r_squared) / (result.n_obs - result.n_params)
+                if denominator > 0:
+                    statistic = numerator / denominator
+                    # Approximate p-value using F-distribution
+                    # This is a rough approximation
+                    p_value = 1 - _f_cdf(statistic, result.n_params - 1, result.n_obs - result.n_params)
+    
+    # Calculate adjusted R-squared
+    adj_r_squared = 1 - (1 - result.r_squared) * (result.n_obs - 1) / (result.n_obs - result.n_params)
+    
+    # Create glance data with proper column names
     glance_data = {
-        'r.squared': result.r_squared,
-        'adj.r.squared': np.nan,  # Would need to calculate
-        'sigma': np.nan,          # Would need to extract from result
-        'statistic': np.nan,      # F-statistic
-        'p.value': np.nan,        # p-value for F-test
+        'r_squared': result.r_squared,
+        'adj_r_squared': adj_r_squared,
+        'sigma': sigma_estimate,
+        'statistic': statistic,
+        'p_value': p_value,
         'df': result.n_params - 1,  # Degrees of freedom
         'logLik': log_lik,
-        'AIC': np.nan,            # Would need log-likelihood
-        'BIC': np.nan,            # Would need log-likelihood
-        'deviance': np.nan,       # Would need to calculate
-        'df.residual': result.n_obs - result.n_params,
+        'AIC': AIC,
+        'BIC': BIC,
+        'deviance': deviance,
+        'df_residual': result.n_obs - result.n_params,
         'nobs': result.n_obs
     }
     
@@ -166,8 +262,7 @@ def glance(result: RegressionResult,
     df = pl.DataFrame([glance_data])
     
     if display:
-        display_title = title or "JIMLA Model Summary (glance)"
         viewer = tv.TV()
-        viewer.print_polars_dataframe(df, title=display_title, color_theme=color_theme)
+        viewer.print_polars_dataframe(df)
     
     return df

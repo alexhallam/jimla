@@ -46,10 +46,9 @@ def main():
         print(f"  {term}: {coef:.4f}")
     print()
     
-    # Get tidy output
+    # Tidy output is automatically printed by lm()
     print("📋 Tidy Output (coefficients and statistics):")
-    tidy_result = tidy(result, display=False)
-    print(tidy_result)
+    print("(Already displayed above by lm())")
     print()
     
     # Augment original data
