@@ -1,10 +1,33 @@
 [project]
 name = "jimla"
 version = "0.1.0"
-description = "regression with variational inference"
+description = "Bayesian linear regression with variational inference, inspired by R's lm() and broom"
 readme = "README.md"
 authors = [{ name = "Alex Hallam", email = "alex.hallam@cfacorp.com" }]
-requires-python = ">=3.13"
+license = { text = "MIT" }
+requires-python = ">=3.9"
+keywords = [
+    "bayesian",
+    "regression",
+    "statistics",
+    "machine-learning",
+    "jax",
+    "polars",
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Scientific/Engineering :: Mathematics",
+    "Topic :: Scientific/Engineering :: Information Analysis",
+]
 dependencies = [
     "blackjax>=1.2.5",
     "fiasto-py>=0.1.0",
@@ -15,8 +38,17 @@ dependencies = [
     "tidy-viewer-py>=0.3.0",
     "rich>=13.0.0",
     "rpy2>=3.5.0",
-    "wayne-trade>=0.1.1",
+    "wayne-trade>=0.1.5",
 ]
+
+[project.urls]
+Homepage = "https://github.com/alexhallam/jimla"
+Repository = "https://github.com/alexhallam/jimla"
+Documentation = "https://github.com/alexhallam/jimla#readme"
+"Bug Tracker" = "https://github.com/alexhallam/jimla/issues"
+
+[project.optional-dependencies]
+test = ["pytest>=7.0.0", "pytest-cov>=4.0.0"]
 
 [build-system]
 requires = ["hatchling"]

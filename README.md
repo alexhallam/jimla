@@ -1,21 +1,23 @@
 # jimla
 
-A Python package for Bayesian linear regression using variational inference, inspired by R's `lm()` function and the `broom` package.
+A Python package for Linear regression using "pathfinder variational inference" using polars dataframes.
 
 ## Features
 
-- **Formula parsing**: Uses [fiasto-py](https://github.com/alexhallam/fiasto-py) to parse Wilkinson's notation formulas
+- **Formula parsing**: Uses [fiasto-py](https://github.com/alexhallam/fiasto-py) for formula parsing and [wayne-trade](https://github.com/alexhallam/wayne) for model matrix generation
 - **Bayesian inference**: Uses [blackjax](https://github.com/blackjax-devs/blackjax) pathfinder for variational inference
-- **Complete Broom API**: Full equivalents of `tidy()`, `augment()`, and `glance()` functions
+- **Automatic prior scaling**: Stan/brms-style autoscaling makes models robust to data scales
 - **Enhanced display**: Results displayed using tidy-viewer for beautiful, formatted output
 - **Progress tracking**: Rich progress bars show variational inference progress
 - **Polars integration**: Works seamlessly with Polars DataFrames
-- **Uncertainty quantification**: Bayesian credible intervals and uncertainty measures
+- **Scale invariant**: Works with any data scale (dollars, inches, milliseconds) without manual tuning via autoscaling
 
 ## Installation
 
 ```bash
 pip install jimla
+# I like:
+# uv pip install jimla
 ```
 
 ## Quick Start
@@ -55,7 +57,7 @@ model_summary = glance(result)
 
 ### `lm(df: pl.DataFrame, formula: str, **kwargs) -> RegressionResult`
 
-Fit a Bayesian linear regression model using blackjax pathfinder.
+Fit a Linear regression model using (blackjax)[https://blackjax-devs.github.io/blackjax/] (pathfinder)[https://blackjax-devs.github.io/blackjax/autoapi/blackjax/vi/pathfinder/index.html].
 
 **Parameters:**
 - `df`: Polars DataFrame containing the data
@@ -108,11 +110,13 @@ Create a one-row model summary, similar to `broom::glance()`.
 
 ## Supported Formula Syntax
 
-jimla supports Wilkinson's notation through fiasto-py:
+jimla supports Wilkinson's notation through fiasto-py and wayne-trade:
 
 - **Basic formulas**: `y ~ x1 + x2`
 - **Interactions**: `y ~ x1 * x2`
+- **Polynomials**: `y ~ poly(x1, 2)`
 - **Intercept control**: `y ~ x1 + x2 - 1` (no intercept)
+- **Complex interactions**: `y ~ x1 + x2*x3 + poly(x1, 2)`
 
 ## Example Output
 
@@ -150,6 +154,7 @@ Model Summary:
 
 - [blackjax](https://github.com/blackjax-devs/blackjax) - Bayesian inference
 - [fiasto-py](https://github.com/alexhallam/fiasto-py) - Formula parsing
+- [wayne-trade](https://github.com/alexhallam/wayne) - Model matrix generation
 - [polars](https://github.com/pola-rs/polars) - Data manipulation
 - [jax](https://github.com/google/jax) - Numerical computing
 - [tidy-viewer-py](https://github.com/alexhallam/tv/tree/main/tidy-viewer-py) - Enhanced data display

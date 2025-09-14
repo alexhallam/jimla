@@ -5,7 +5,8 @@ A Python package for Bayesian linear regression using fiasto-py for formula pars
 and blackjax for variational inference, with broom-style tidy output.
 """
 
-from .regression import lm, tidy, augment, glance
+from .models import lm, RegressionResult
+from .broom import tidy, augment, glance
 
 __version__ = "0.1.0"
-__all__ = ["lm", "tidy", "augment", "glance"]
+__all__ = ["lm", "tidy", "augment", "glance", "RegressionResult"]

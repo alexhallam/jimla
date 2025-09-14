@@ -33,13 +33,7 @@ def load_mtcars():
     # Load with polars
     df = pl.read_csv(mtcars_path)
     
-    print("📊 mtcars dataset loaded:")
-    print(f"Shape: {df.shape}")
-    print("\nFirst few rows:")
-    print(df.head())
-    
-    print("\nDataset info:")
-    print(df.describe())
+    print(f"📊 mtcars dataset: {df.shape[0]} observations, {df.shape[1]} variables")
     
     return df
 
@@ -89,47 +83,43 @@ def fit_r_model(df, formula):
 def compare_models(df, formula):
     """Compare jimla and R models on the same data."""
     
-    print("="*80)
-    print("COMPARING JIMLA (Bayesian) vs R lm() (Frequentist)")
-    print("="*80)
-    print(f"Formula: {formula}")
-    print(f"Dataset: {df.shape[0]} observations, {df.shape[1]} variables")
-    print()
+    print(f"\n🔍 Formula: {formula}")
     
     # Fit jimla model
-    print("🔍 Fitting JIMLA (Bayesian) model...")
     jimla_result = lm(df, formula)
     jimla_tidy = tidy(jimla_result, display=False)
     
-    print("\n📊 Fitting R lm() (Frequentist) model...")
+    # Fit R model
     r_result = fit_r_model(df, formula)
     r_tidy = r_result["tidy"]
     
     # Display jimla results
-    print("\n" + "="*60)
+    print("\n" + "="*50)
     print("JIMLA (Bayesian) Results")
-    print("="*60)
+    print("="*50)
     tidy(jimla_result, title="JIMLA Bayesian Regression")
     
     # Display R results
-    print("\n" + "="*60)
+    print("\n" + "="*50)
     print("R lm() (Frequentist) Results")
-    print("="*60)
+    print("="*50)
     print("R summary() coefficients:")
     print(r_tidy)
     
-    # Also show the raw R summary
-    print("\nRaw R summary output:")
-    print(r_result["summary"])
-    
     # Create comparison table
-    print("\n" + "="*60)
+    print("\n" + "="*50)
     print("COMPARISON TABLE")
-    print("="*60)
+    print("="*50)
     
     # Prepare comparison data
     jimla_coefs = dict(zip(jimla_tidy["term"], jimla_tidy["estimate"]))
     r_coefs = dict(zip(r_tidy["term"], r_tidy["estimate"]))
+    
+    # Standardize intercept naming for comparison
+    if "intercept" in jimla_coefs and "(Intercept)" in r_coefs:
+        jimla_coefs["(Intercept)"] = jimla_coefs.pop("intercept")
+    elif "(Intercept)" in jimla_coefs and "intercept" in r_coefs:
+        r_coefs["(Intercept)"] = r_coefs.pop("intercept")
     
     # Get all terms
     all_terms = set(jimla_coefs.keys()) | set(r_coefs.keys())
@@ -153,31 +143,13 @@ def compare_models(df, formula):
     print(comparison_df)
     
     # Summary statistics
-    print("\n" + "="*60)
-    print("SUMMARY STATISTICS")
-    print("="*60)
-    print(f"JIMLA R-squared: {jimla_result.r_squared:.4f}")
-    print(f"R lm() R-squared: {r_result['r_squared']:.4f}")
-    
-    # Calculate mean absolute difference
-    valid_diffs = [d for d in comparison_data if not np.isnan(d["difference"])]
-    if valid_diffs:
-        mean_abs_diff = np.mean([abs(d["difference"]) for d in valid_diffs])
-        print(f"Mean absolute difference in coefficients: {mean_abs_diff:.6f}")
-    
-    print(f"\n🎯 REAL DATA ASSESSMENT:")
-    print(f"Both JIMLA and R show excellent agreement on real-world data!")
-    print(f"R-squared: {jimla_result.r_squared:.4f} (good model fit)")
+    print(f"\n📊 R-squared: JIMLA={jimla_result.r_squared:.4f}, R={r_result['r_squared']:.4f}")
     
     return jimla_result, r_result, comparison_df
 
 if __name__ == "__main__":
     if not R_AVAILABLE:
         print("❌ Cannot run comparison without R. Please install R and ensure rpy2 can connect to it.")
-        print("\nTo install R:")
-        print("1. Download R from https://www.r-project.org/")
-        print("2. Install R")
-        print("3. No additional R packages needed - just base R")
         exit(1)
     
     # Load mtcars dataset
@@ -188,8 +160,8 @@ if __name__ == "__main__":
     jimla_result, r_result, comparison = compare_models(df, formula)
     
     # Additional comparison with different formula
-    print("\n" + "="*80)
+    print("\n" + "="*60)
     print("ADDITIONAL COMPARISON: Single predictor model")
-    print("="*80)
+    print("="*60)
     
     jimla_result2, r_result2, comparison2 = compare_models(df, "mpg ~ wt")
