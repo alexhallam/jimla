@@ -1,6 +1,23 @@
-# jimla
+<h1 align="center">jimla</h1>
+
+<p align="center">
+  <img src="https://openmoji.org/data/color/svg/1F47E.svg" alt="logo" width="240">
+</p>
+
+---
+
 
 A Python package for Linear regression using "pathfinder variational inference" using polars dataframes.
+
+## Supported Formula Syntax
+
+jimla supports Wilkinson's notation through fiasto-py and wayne-trade:
+
+- **Basic formulas**: `y ~ x1 + x2`
+- **Interactions**: `y ~ x1 * x2`
+- **Polynomials**: `y ~ poly(x1, 2)`
+- **Intercept control**: `y ~ x1 + x2 - 1` (no intercept)
+- **Complex interactions**: `y ~ x1 + x2*x3 + poly(x1, 2)`
 
 ## Features
 
@@ -40,11 +57,71 @@ augment(result, df)
 glance(result)
 ```
 
-## API Reference
+![output](img/output.png)
 
-### `lm(df: pl.DataFrame, formula: str, **kwargs) -> RegressionResult`
 
-Fit a Linear regression model using (blackjax)[https://blackjax-devs.github.io/blackjax/] (pathfinder)[https://blackjax-devs.github.io/blackjax/autoapi/blackjax/vi/pathfinder/index.html].
+
+
+Fit a Linear regression model using [blackjax](https://blackjax-devs.github.io/blackjax/)[pathfinder](https://blackjax-devs.github.io/blackjax/autoapi/blackjax/vi/pathfinder/index.html).
+
+
+## Motivation - A Second Best At Everything
+
+This is not the fastest way to do regression and it is not the most accurate way to do regression.
+
+The fastest options will be frequentist. I use this all the time.
+
+I made this package to get something that would give some uncertainty quantification (UQ), but I did not want to wait for MCMC to converge.
+
+## How does this fit in with other regression options?
+
+I am not going to oversell this regression package. I am going to give you the lay of the land. I have a table below that probably generalizes more than experts would, but I think it is a good starting point.
+
+| Axis                      | Pathfinder VI                                                                                                  | R `lm()` (OLS)                                                                 | NUTS (dynamic HMC)                                                                     | Laplace approximation                                            |
+| ------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------- | ---------------------------------------------------------------- |
+| What it computes          | Approx. **posterior draws** via quasi-Newton path variational fit; selects best normal (and can **multi-start + importance-resample**). | **Point estimates** and asymptotic SEs/CI under OLS assumptions; no posterior. | **Asymptotically exact posterior** samples via MCMC trajectories.                      | **Single Gaussian** at MAP from local curvature (Hessian).       |
+| Uncertainty               | **Bayesian**, from samples (can be close to short-run HMC; > ADVI on many tests).                                                       | **Frequentist** SEs; relies on homoskedasticity/CLT.                           | **Bayesian**, gold standard if mixed well.                                             | **Bayesian-ish**, sometimes gets a bad rap for being **too narrow** / symmetric. My opinion is that it is a good approximation for many problems.          |
+| Geometry & multi-modality | Better than Laplace (fits **along a path**; multiple starts help); still VI—can **miss minor modes** without restarts.                  | N/A (optimization).                                                            | Handles **strong skew/correlations** and multi-modal posteriors (with enough compute). | **Local & unimodal** by design; struggles with skew/heavy tails. |
+| Speed & scale             | **1–2 orders of magnitude fewer grads** than ADVI/short HMC in paper benchmarks; embarrassingly parallel. Great for big N, moderate D.  | **Fastest** for linear models; closed forms.                                   | **Slowest** per effective sample—gradients per step + tuning; excellent but costly.    | **Very fast**; just one mode’s Hessian.                          |
+| Output for users          | **Posterior draws, ELBO/KL diagnostics**, WAIC/LOO feasible; can act as **initializer for MCMC**.                                       | Coefs, SEs, t-tests, R²; classic diagnostics.                                  | Posterior draws + rich diagnostics (ESS, R-hat, divergences).                          | Gaussian approx (mean/cov), log-evidence approx.                 |
+| Where it shines           | GLMs & hierarchical regression when you want **near-Bayesian UQ** at **interactive speeds**; GPU-friendly with JAX.                     | Simple linear regression with OLS assumptions; quick inference/explanation.    | Final-mile inference where **calibration is critical** (tails, decisions).             | Quick marginal-likelihoods, well-behaved unimodal posteriors.    |
+| Where it struggles        | **Extreme** multi-modality/heavy-tails; may **underestimate variance** (common to VI).                                                  | Misspecified errors, small-N inference, complex priors.                        | Compute/time; tricky posteriors need careful diagnostics.                              | Anything non-Gaussian/strongly skew or multi-modal.              |
+
+
+
+## Motivation - A Second Best At Everything
+
+
+Bayesian-style uncertainty quantification (UQ) that is faster than MCMC, but slower than Laplace Approximation. From this we get posterior draws (credible intervals, predictions) faster than NUTS and with less local bias than Laplace approximation, enabling Bayesian regression for practitioners who can’t afford full MCMC on every model.
+
+## But We Already Have Stan/Brms/PyMC/Bambi/rstanarm/etc.
+
+1. A focused package is an easy to maintain package.
+
+I had an experience with one Bayesian linear regression package which offered all MCMC options as well as variational inference and laplace. I was clear that the package really focused on one flavour or Bayesian ingerence. When I attempted to fit a simple model with Laplace approcimation the package crashed. A sensible person would just open an issue. I am not sensible. I am stubborn.
+
+2. Many Bayesian packages have C++ dependancies/toolchains which take some care to install.
+
+3. I was just curious. How far can we take VI via pathfinder before it breaks?
+
+My hunch is that this this is a good approximation for my practical regression needs. I am not going to claim that it is a good approximation for all problems.
+
+4. I like pretty things.
+
+I wanted pretty output. I wanted a nice progress bar. I wanted a nice way to display data.
+
+5. I like to use Polars.
+
+I wanted a Polars first regression package. I can see myself integrating Narwhals in the future. At while I am developing I am using Polars.
+
+6. JAX is cool.
+
+I wanted to use JAX. I wanted to use pathfinder. I wanted to use blackjax. It is a minimal way to do Bayesian inference.
+
+7. I am testing some fomula parsing
+
+This sits on top of fiasto-py and wayne-trade. I have a hypothesis that decoupling parsing from the model matrix generation will be a good thing. I am probably wrong, but I am going to try it anyway. Yes, I am aware of formulaic and formulae. I have fiasto-py sitting on top of `fiasto`, a rust package that offers lexing and parsing of Wilkinson's formulas.
+
 
 **Parameters:**
 - `df`: Polars DataFrame containing the data
@@ -95,46 +172,7 @@ Create a one-row model summary, similar to `broom::glance()`.
 **Returns:**
 - `pl.DataFrame`: One-row DataFrame with: r_squared, adj_r_squared, sigma, statistic, p_value, df, logLik, AIC, BIC, deviance, df_residual, nobs
 
-## Supported Formula Syntax
 
-jimla supports Wilkinson's notation through fiasto-py and wayne-trade:
-
-- **Basic formulas**: `y ~ x1 + x2`
-- **Interactions**: `y ~ x1 * x2`
-- **Polynomials**: `y ~ poly(x1, 2)`
-- **Intercept control**: `y ~ x1 + x2 - 1` (no intercept)
-- **Complex interactions**: `y ~ x1 + x2*x3 + poly(x1, 2)`
-
-## Example Output
-
-```
-Formula: y ~ x1 + x2
-R-squared: 0.8951
-Number of observations: 100
-Number of parameters: 3
-
-Coefficients:
-  (Intercept): 2.0370
-  x1: 1.6048
-  x2: 0.7877
-
-Tidy output (with tidy-viewer):
-```
-Regression Results: y ~ x1 + x2
-
-        tv dim: 3 x 7
-        term        estimate std.error statistic p.value conf.low conf.high 
-        <str>       <f64>    <f64>     <f64>     <f64>   <f64>    <f64>     
-     1  (Intercept) 2.04     0.0463    43.9      0       1.94     2.12      
-     2  x1          1.60     0.0592    27.1      0       1.49     1.72      
-     3  x2          0.788    0.0654    12.0      0       0.662    0.912     
-
-Model Summary:
-  Formula: y ~ x1 + x2
-  R-squared: 0.8951
-  Observations: 100
-  Parameters: 3
-```
 ```
 
 ## Dependencies
@@ -150,3 +188,13 @@ Model Summary:
 ## License
 
 MIT License
+
+## What is jimla?
+
+I am glade you asked. You will be disappointed in the answer.
+
+Many packages of cool acronyms or recursive names. Clever people make clever names. I am not clever.
+
+I just finished reading [11/22/63](https://en.wikipedia.org/wiki/11/22/63). In the book, “jimla” is a mispronunciation of the main character’s name, Jim, by the “yellow card man,” a drunk guardian of time. The word then takes on a life of its own, becoming a nightmarish, disembodied form that grows angrier as Jim continues to change the obdurate past.
+
+One could say that this name connects with the purpose of the package. MCMC is the proper order of things a pure Monte Carlo Chain. In contrast, the jimla is observed as renegade time streams ricochet across a timeline. By side stepping MCMC will we awaken the jimla?
