@@ -1,3 +1,7 @@
+[![PyPI version](https://img.shields.io/pypi/v/jimla.svg?cacheSeconds=3600)](https://pypi.org/project/jimla/)
+[![Python versions](https://img.shields.io/pypi/pyversions/jimla.svg)](https://pypi.org/project/jimla/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
 <h1 align="center">jimla</h1>
 
 <p align="center">
