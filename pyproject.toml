@@ -30,7 +30,7 @@ classifiers = [
 ]
 dependencies = [
     "blackjax>=1.2.5",
-    "fiasto-py>=0.1.0",
+    "fiasto-py>=0.1.4",
     "polars>=1.33.1",
     "jax>=0.4.0",
     "jaxlib>=0.4.0",
